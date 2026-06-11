@@ -12,7 +12,9 @@ export default function Viewport({
   isTritanopiaActive,
   isLowContrastActive,
   isTunnelVisionActive,
-  isAchromatopsiaActive
+  isAchromatopsiaActive,
+  auditReport, // Incoming AI state from page.js
+  isLoading    // Incoming loading flag from page.js
 }) {
   const [pos, setPos] = useState({ x: '50%', y: '50%' })
   const containerRef = useRef(null)
@@ -40,9 +42,6 @@ export default function Viewport({
     }
   }, [isTunnelVisionActive])
 
-  // Build the CSS filter string applied directly to the iframe element.
-  // Applying filter to the iframe itself composites the effect onto its
-  // rendered bitmap, which is the only reliable way to affect iframe content.
   const iframeFilter = [
     isProtanopiaActive    && 'url(#protanopia-filter)',
     isTritanopiaActive    && 'url(#tritanopia-filter)',
@@ -51,12 +50,14 @@ export default function Viewport({
     isBlurActive          && 'blur(4px)',
   ].filter(Boolean).join(' ')
 
+  // Controls visibility toggle for the split panel
+  const isPanelActive = isLoading || auditReport;
+
   return (
     <div ref={containerRef} className="flex h-full w-full flex-col bg-slate-950">
 
       {/* URL bar — editable on mobile, display-only on desktop */}
       <div className="shrink-0 border-b border-slate-800 bg-slate-900">
-
         {/* Mobile: editable form */}
         <form
           onSubmit={onUrlSubmit}
@@ -91,7 +92,6 @@ export default function Viewport({
             SANDBOX
           </span>
         </div>
-
       </div>
 
       {/* Mobile notice */}
@@ -99,30 +99,77 @@ export default function Viewport({
         Some sites block iframes — open Controls to apply filters or switch to Research.
       </div>
 
-      {/* Canvas */}
-      <div className="relative flex-1 overflow-hidden bg-white">
+      {/* Main Workspace Split Layout */}
+      <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
+        
+        {/* Webpage Sandbox Viewport */}
+        <div className="relative flex-1 bg-white overflow-hidden h-full">
+          {isTunnelVisionActive && (
+            <div
+              className="pointer-events-none absolute inset-0 z-20"
+              style={{
+                background: `radial-gradient(circle 100px at ${pos.x} ${pos.y}, transparent 0%, rgba(15,23,42,0.98) 100%)`
+              }}
+            />
+          )}
 
-        {/* Tunnel vision overlay — radial gradient that follows cursor/touch */}
-        {isTunnelVisionActive && (
-          <div
-            className="pointer-events-none absolute inset-0 z-20"
-            style={{
-              background: `radial-gradient(circle 100px at ${pos.x} ${pos.y}, transparent 0%, rgba(15,23,42,0.98) 100%)`
-            }}
+          <iframe
+            src={currentUrl}
+            title="Accessibility Target Viewport"
+            style={{ filter: iframeFilter || undefined }}
+            className={`h-full w-full border-none bg-white ${isTunnelVisionActive ? 'pointer-events-none' : 'pointer-events-auto'}`}
+            sandbox="allow-scripts allow-same-origin allow-forms"
           />
-        )}
+        </div>
 
-        {/* Live site — all visual filters applied directly to the iframe element */}
-        <iframe
-          src={currentUrl}
-          title="Accessibility Target Viewport"
-          style={{ filter: iframeFilter || undefined }}
-          className={`h-full w-full border-none bg-white ${isTunnelVisionActive ? 'pointer-events-none' : 'pointer-events-auto'}`}
-          sandbox="allow-scripts allow-same-origin allow-forms"
-        />
+        {/* Split Panel: AI Audit Dashboard */}
+        {isPanelActive && (
+          <div className="flex h-2/5 w-full flex-col border-t border-slate-800 bg-slate-950 md:h-full md:w-[380px] md:border-t-0 md:border-l lg:w-[440px] shrink-0 overflow-hidden">
+            
+            {/* Panel Tab Header */}
+            <div className="flex h-10 shrink-0 items-center justify-between border-b border-slate-800 bg-slate-900/40 px-4">
+              <span className="text-[11px] font-bold tracking-wider text-slate-300 uppercase font-mono">
+                ⚡ AccessiLab AI Engine
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className={`h-2 w-2 rounded-full ${isLoading ? 'bg-yellow-500 animate-pulse' : 'bg-emerald-500'}`} />
+                <span className="text-[10px] font-mono text-slate-500">{isLoading ? 'ANALYZING' : 'READY'}</span>
+              </div>
+            </div>
+
+            {/* Panel Sheet Body */}
+            <div className="flex-1 overflow-y-auto p-4 font-sans text-xs text-slate-300 custom-scrollbar selection:bg-yellow-500 selection:text-slate-950">
+              {isLoading ? (
+                /* Bauhaus Minimalist Skeleton Pulse Loader */
+                <div className="space-y-4 animate-pulse pt-2">
+                  <div className="h-4 w-1/3 rounded bg-slate-800" />
+                  <div className="space-y-2">
+                    <div className="h-3 w-full rounded bg-slate-800" />
+                    <div className="h-3 w-5/6 rounded bg-slate-800" />
+                    <div className="h-3 w-4/5 rounded bg-slate-800" />
+                  </div>
+                  <div className="h-px bg-slate-800 my-4" />
+                  <div className="h-4 w-1/4 rounded bg-slate-800" />
+                  <div className="space-y-2">
+                    <div className="h-3 w-full rounded bg-slate-800" />
+                    <div className="h-3 w-11/12 rounded bg-slate-800" />
+                  </div>
+                </div>
+              ) : (
+                /* Audit Report Markdown Text Render Sheet */
+                <div className="prose prose-invert max-w-none text-slate-300 selection:bg-yellow-400">
+                  <p className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed tracking-normal">
+                    {auditReport}
+                  </p>
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
       </div>
 
-      {/* SVG color-blindness filter definitions (must live in the host document) */}
+      {/* SVG color-blindness filter definitions */}
       <svg className="absolute h-0 w-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <filter id="protanopia-filter">

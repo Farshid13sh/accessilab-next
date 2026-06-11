@@ -56,22 +56,26 @@ export default function Home() {
   // Trigger the server-side Claude API Route
   const handleRunAudit = async () => {
     setIsLoading(true);
-    setAuditReport(null);
+    setAuditReport(null); // Clear previous reports to trigger the skeleton pulse layout
+    
     try {
       const response = await fetch('/api/audit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: currentUrl }),
       });
+      
       const data = await response.json();
-      if (data.error) {
-        alert(data.error);
+      
+      if (!response.ok || data.error) {
+        setAuditReport(`### System Diagnostic Error\n${data.error || "Failed to compile AI layout assessment."}`);
       } else {
         setAuditReport(data.report);
         console.log("Audit Report Received:", data.report);
       }
     } catch (err) {
       console.error("Audit failed:", err);
+      setAuditReport("### Connection Interrupted\nFailed to sync with the internal AI orchestration endpoint.");
     } finally {
       setIsLoading(false);
     }
@@ -103,13 +107,13 @@ export default function Home() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Pass AI actions to the Header */}
-        <Header
-          setIsSidebarOpen={isSidebarOpen}
-          currentUrl={currentUrl}
-          currentView={currentView}
-          onRunAudit={handleRunAudit}
-          isLoading={isLoading}
-        />
+      <Header
+        setIsSidebarOpen={setIsSidebarOpen}
+        currentUrl={currentUrl}
+        currentView={currentView}
+        onRunAudit={handleRunAudit}
+        isLoading={isLoading}
+      />
 
         <main className="flex-1 overflow-hidden">
           {currentView === 'workspace' ? (
