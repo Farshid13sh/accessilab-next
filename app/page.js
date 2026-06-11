@@ -19,6 +19,10 @@ export default function Home() {
   const [isAchromatopsiaActive, setIsAchromatopsiaActive] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // AI Audit States
+  const [auditReport, setAuditReport] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
   const activeFilters = {
     blur:       isBlurActive,
     protanopia: isProtanopiaActive,
@@ -49,9 +53,32 @@ export default function Home() {
     setCurrentUrl(cleanUrl);
   };
 
+  // Trigger the server-side Claude API Route
+  const handleRunAudit = async () => {
+    setIsLoading(true);
+    setAuditReport(null);
+    try {
+      const response = await fetch('/api/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: currentUrl }),
+      });
+      const data = await response.json();
+      if (data.error) {
+        alert(data.error);
+      } else {
+        setAuditReport(data.report);
+        console.log("Audit Report Received:", data.report);
+      }
+    } catch (err) {
+      console.error("Audit failed:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex h-svh w-screen overflow-hidden bg-slate-950 font-sans text-slate-200">
-
       <Sidebar
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
@@ -74,19 +101,21 @@ export default function Home() {
         setIsAchromatopsiaActive={setIsAchromatopsiaActive}
       />
 
-      {/* Right column: header + main stage */}
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* Pass AI actions to the Header */}
         <Header
-          setIsSidebarOpen={setIsSidebarOpen}
+          setIsSidebarOpen={isSidebarOpen}
           currentUrl={currentUrl}
           currentView={currentView}
+          onRunAudit={handleRunAudit}
+          isLoading={isLoading}
         />
 
         <main className="flex-1 overflow-hidden">
           {currentView === 'workspace' ? (
-            /* pb-16 on mobile reserves space for the fixed FilterBar handle */
             <div className="h-full p-2 pb-16 sm:p-3 sm:pb-16 md:p-4 md:pb-4">
               <div className="h-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-inner">
+                {/* Pass report down to the viewport canvas layout */}
                 <Viewport
                   currentUrl={currentUrl}
                   urlInput={urlInput}
@@ -98,6 +127,8 @@ export default function Home() {
                   isLowContrastActive={isLowContrastActive}
                   isTunnelVisionActive={isTunnelVisionActive}
                   isAchromatopsiaActive={isAchromatopsiaActive}
+                  auditReport={auditReport}
+                  isLoading={isLoading}
                 />
               </div>
             </div>
@@ -109,14 +140,12 @@ export default function Home() {
         </main>
       </div>
 
-      {/* Mobile-only filter bar — fixed bottom sheet, hidden on md+ */}
       {currentView === 'workspace' && (
         <FilterBar
           activeFilters={activeFilters}
           onToggle={handleFilterToggle}
         />
       )}
-
     </div>
   );
 }
